@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1e3a8a">
+<title>Control de Asistencia GPS</title>
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --ink:#1e293b; --ink-soft:#64748b; --line:#e2e8f0;
+    --blue:#2563eb; --blue-dark:#1e40af; --orange:#ea580c;
+    --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
+    --amber:#d97706; --amber-bg:#fef3c7;
+    --radius:16px; --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+    --shadow-lg:0 10px 30px rgba(15,23,42,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45;font-size:16px;padding-bottom:78px;-webkit-font-smoothing:antialiased;}
+  header{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:18px 18px 16px;position:sticky;top:0;z-index:40;box-shadow:0 2px 10px rgba(30,58,138,.25);}
+  header h1{font-size:19px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:8px;}
+  header .sub{font-size:12.5px;opacity:.85;margin-top:2px;display:flex;align-items:center;gap:6px;}
+  .pin-ico{width:22px;height:22px;flex-shrink:0;}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:#fbbf24;display:inline-block;}
+  .sync-dot.ok{background:#4ade80;} .sync-dot.off{background:#f87171;}
+  main{max-width:560px;margin:0 auto;padding:16px 14px 24px;}
+  .view{display:none;} .view.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);margin-bottom:14px;border:1px solid var(--line);}
+  .card h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin-bottom:14px;font-weight:700;}
+  .card h2 .step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;margin-right:8px;}
+  label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;}
+  input,select,textarea{width:100%;padding:13px 14px;font-size:16px;border:1.5px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-family:inherit;transition:border-color .15s;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);}
+  .field{margin-bottom:14px;} .field:last-child{margin-bottom:0;}
+  .opt{color:#94a3b8;font-weight:500;}
+  .row{display:flex;gap:10px;} .row > *{flex:1;}
+  .big-btns{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;}
+  .btn-mark{border:none;border-radius:18px;color:#fff;padding:22px 10px;font-size:18px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:transform .1s,box-shadow .2s;box-shadow:var(--shadow-lg);}
+  .btn-mark:active{transform:scale(.96);}
+  .btn-mark:disabled{opacity:.45;box-shadow:none;cursor:not-allowed;}
+  .btn-in{background:linear-gradient(135deg,#2563eb,#1d4ed8);}
+  .btn-out{background:linear-gradient(135deg,#ea580c,#c2410c);}
+  .btn-mark svg{width:34px;height:34px;}
+  button.btn{border:none;border-radius:11px;padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .15s,transform .1s;}
+  button.btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-ghost{background:#f1f5f9;color:var(--ink);border:1px solid var(--line);}
+  .btn-danger{background:var(--red-bg);color:var(--red);}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-block{width:100%;}
+  #statusBox{border-radius:14px;padding:16px;margin-top:14px;display:none;border-left:5px solid;font-size:14.5px;animation:fade .2s;}
+  #statusBox.show{display:block;}
+  #statusBox.ok{background:var(--green-bg);border-color:var(--green);color:#14532d;}
+  #statusBox.bad{background:var(--red-bg);border-color:var(--red);color:#7f1d1d;}
+  #statusBox.warn{background:var(--amber-bg);border-color:var(--amber);color:#78350f;}
+  #statusBox .st-title{font-weight:700;font-size:15.5px;display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  #statusBox .st-detail{font-size:13.5px;opacity:.9;}
+  .gps-hint{font-size:12.5px;color:var(--ink-soft);margin-top:10px;display:flex;align-items:center;gap:6px;}
+  .gps-hint .dot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--line);}
+  table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
+  th{background:#f8fafc;text-align:left;padding:10px 12px;font-weight:700;color:var(--ink-soft);font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;border-bottom:2px solid var(--line);position:sticky;top:0;}
+  td{padding:10px 12px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+  .tag-in{background:#dbeafe;color:#1e40af;} .tag-out{background:#ffedd5;color:#9a3412;}
+  .tag-valido{background:var(--green-bg);color:#15803d;} .tag-fuera{background:var(--red-bg);color:#b91c1c;}
+  .tag-sin_permiso{background:var(--amber-bg);color:#b45309;} .tag-error{background:#f1f5f9;color:#475569;}
+  .tag-pending{background:#e0e7ff;color:#4338ca;}
+  tr.alert-row{background:#fff7ed;} tr.alert-row.crit{background:#fef2f2;}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .filters .full{grid-column:1/-1;}
+  .filters label{margin-bottom:4px;font-size:12px;}
+  .filters input,.filters select{padding:10px 11px;font-size:14px;}
+  .summary-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .stat{flex:1;min-width:90px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;box-shadow:var(--shadow);}
+  .stat .n{font-size:24px;font-weight:800;line-height:1;}
+  .stat .l{font-size:11px;color:var(--ink-soft);margin-top:4px;text-transform:uppercase;letter-spacing:.3px;}
+  .stat.danger .n{color:var(--red);} .stat.warn .n{color:var(--amber);}
+  .empty{text-align:center;padding:34px 20px;color:var(--ink-soft);font-size:14px;}
+  .empty svg{width:44px;height:44px;opacity:.35;margin-bottom:10px;}
+  .site-item{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--line);border-radius:13px;margin-bottom:10px;background:#fff;}
+  .site-item.off{opacity:.55;}
+  .site-item .si-body{flex:1;min-width:0;}
+  .site-item .si-name{font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px;}
+  .site-item .si-meta{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .site-item .si-coords{font-size:11px;color:#94a3b8;margin-top:3px;font-variant-numeric:tabular-nums;}
+  .si-actions{display:flex;flex-direction:column;gap:6px;}
+  .si-actions button{padding:7px 10px;font-size:12px;border-radius:9px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;}
+  .badge{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;}
+  .badge-on{background:var(--green-bg);color:#15803d;} .badge-off{background:#f1f5f9;color:#64748b;}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:90;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px);}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;width:100%;max-width:560px;border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));max-height:92vh;overflow-y:auto;animation:slideUp .28s ease;}
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:none;}}
+  .modal h3{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}
+  .modal h3 .x{font-size:26px;color:#94a3b8;cursor:pointer;line-height:1;padding:0 6px;}
+  .capture-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  /* PIN modal */
+  .pin-modal{background:#fff;width:100%;max-width:340px;border-radius:22px;padding:26px 22px;text-align:center;animation:fade .25s;}
+  .pin-modal .lock{width:44px;height:44px;margin:0 auto 12px;color:var(--blue);}
+  .pin-modal h3{font-size:18px;font-weight:700;margin-bottom:4px;}
+  .pin-modal p{font-size:13px;color:var(--ink-soft);margin-bottom:18px;}
+  .pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:20px;}
+  .pin-dots span{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);transition:all .15s;}
+  .pin-dots span.filled{background:var(--blue);border-color:var(--blue);}
+  .pin-dots.err span{border-color:var(--red);animation:shake .35s;}
+  @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-7px);}75%{transform:translateX(7px);}}
+  .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .pin-pad button{aspect-ratio:1.6;border:none;background:#f1f5f9;border-radius:14px;font-size:22px;font-weight:600;color:var(--ink);cursor:pointer;font-family:inherit;transition:background .12s,transform .1s;}
+  .pin-pad button:active{background:#e2e8f0;transform:scale(.95);}
+  .pin-pad button.fn{font-size:14px;color:var(--ink-soft);background:transparent;}
+  .pin-center-bg{align-items:center;}
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:50;background:#fff;border-top:1px solid var(--line);display:flex;max-width:560px;margin:0 auto;box-shadow:0 -2px 12px rgba(15,23,42,.06);padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1;border:none;background:none;padding:11px 4px 9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;color:#94a3b8;font-size:11px;font-weight:600;font-family:inherit;transition:color .15s;}
+  nav button svg{width:24px;height:24px;}
+  nav button.active{color:var(--blue);}
+  nav button .nav-badge{position:absolute;top:6px;margin-left:18px;background:var(--red);color:#fff;font-size:9px;min-width:16px;height:16px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
+  #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:600;z-index:100;opacity:0;transition:all .3s;pointer-events:none;box-shadow:var(--shadow-lg);max-width:90%;text-align:center;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .muted{color:var(--ink-soft);font-size:13px;} .tiny{font-size:11.5px;}
+  details.help{margin-top:8px;}
+  details.help summary{font-size:12.5px;color:var(--blue);cursor:pointer;font-weight:600;}
+  details.help p{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
+  .pending-banner{background:#eef2ff;border:1px solid #c7d2fe;color:#4338ca;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:14px;display:none;align-items:center;justify-content:space-between;gap:10px;}
+  .pending-banner.show{display:flex;}
+  .pending-banner button{background:#4338ca;color:#fff;border:none;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <svg class="pin-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Control de Asistencia
+  </h1>
+  <div class="sub"><span class="sync-dot" id="syncDot"></span><span id="headerSub">Registro de marcas con validación GPS</span></div>
+</header>
+
+<main>
+  <!-- ============ MARCAR ============ -->
+  <section class="view active" id="view-mark">
+    <div class="pending-banner" id="pendingBanner">
+      <span id="pendingText"></span>
+      <button id="syncNow">Sincronizar</button>
+    </div>
+    <div class="card">
+      <h2><span class="step">1</span>Funcionario</h2>
+      <div class="field">
+        <label for="empName">Nombre completo</label>
+        <input id="empName" type="text" placeholder="Ej: María Rodríguez Solano" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="empCode">Código de empleado o cédula <span class="opt">(opcional)</span></label>
+        <input id="empCode" type="text" placeholder="Ej: 1-1234-5678" inputmode="text">
+      </div>
+      <button class="btn btn-ghost btn-block" id="saveEmp" style="margin-top:4px;">Guardar mis datos</button>
+    </div>
+    <div class="card">
+      <h2><span class="step">2</span>Site / Local</h2>
+      <div class="field">
+        <label for="siteSelect">Seleccioná tu ubicación de trabajo</label>
+        <select id="siteSelect"><option value="">— Elegí un site —</option></select>
+      </div>
+      <div id="siteInfo" class="muted tiny" style="display:none;"></div>
+    </div>
+    <div class="card">
+      <h2><span class="step">3</span>Marcar</h2>
+      <div class="big-btns">
+        <button class="btn-mark btn-in" id="btnIn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Entrada
+        </button>
+        <button class="btn-mark btn-out" id="btnOut">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Salida
+        </button>
+      </div>
+      <div id="statusBox"></div>
+      <div class="gps-hint"><span class="dot" id="gpsDot"></span><span id="gpsHint">El GPS se activa al marcar. Tené el celular con ubicación encendida.</span></div>
+      <details class="help">
+        <summary>¿Por qué dice "Fuera del sitio"?</summary>
+        <p>La marca se compara con la ubicación registrada del site. Si estás más lejos del radio permitido, queda registrada igual pero marcada como fuera de sitio para revisión del supervisor. La precisión del GPS del celular puede variar entre 5 y 50 metros.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ ADMIN ============ -->
+  <section class="view" id="view-admin">
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Filtros</span>
+        <button class="btn btn-ghost tiny" id="refreshLogs" style="padding:6px 10px;text-transform:none;letter-spacing:0;">↻ Actualizar</button>
+      </h2>
+      <div class="filters">
+        <div><label>Desde</label><input type="date" id="fDateFrom"></div>
+        <div><label>Hasta</label><input type="date" id="fDateTo"></div>
+        <div><label>Funcionario</label><input type="text" id="fEmp" placeholder="Nombre…"></div>
+        <div><label>Site / Local</label><select id="fSite"><option value="">Todos</option></select></div>
+        <div><label>Provincia</label><select id="fProv"><option value="">Todas</option></select></div>
+        <div><label>Cantón</label><select id="fCanton"><option value="">Todos</option></select></div>
+        <div><label>Tipo</label><select id="fType"><option value="">Entrada y salida</option><option value="entrada">Entrada</option><option value="salida">Salida</option></select></div>
+        <div><label>Estado GPS</label><select id="fGps"><option value="">Todos</option><option value="valido">Válido</option><option value="fuera_del_sitio">Fuera del sitio</option><option value="sin_permiso">Sin permiso</option><option value="error">Error</option></select></div>
+        <div class="full row">
+          <button class="btn btn-ghost" id="clearFilters">Limpiar</button>
+          <button class="btn btn-primary" id="exportCsv">Exportar CSV</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Registros</span>
+        <button class="btn btn-ghost tiny" id="toggleSummaryView" style="padding:6px 10px;text-transform:none;letter-spacing:0;">Ver resumen diario</button>
+      </h2>
+      <div id="logsContainer"><div class="empty">Cargando…</div></div>
+    </div>
+    <div class="card">
+      <h2>Seguridad</h2>
+      <button class="btn btn-ghost btn-block" id="changePin">Cambiar PIN del panel</button>
+    </div>
+  </section>
+
+  <!-- ============ SITES ============ -->
+  <section class="view" id="view-sites">
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-weight:700;font-size:16px;">Catálogo de sites</div>
+        <div class="muted tiny" id="siteCount"></div>
+      </div>
+      <button class="btn btn-primary" id="addSite">+ Agregar</button>
+    </div>
+    <div id="sitesList"></div>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-view="mark" id="navMark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Marcar
+  </button>
+  <button data-view="admin" id="navAdmin" style="position:relative;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg>
+    Admin
+  </button>
+  <button data-view="sites" id="navSites">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    Sites
+  </button>
+</nav>
+
+<!-- MODAL SITE -->
+<div class="modal-bg" id="siteModalBg">
+  <div class="modal">
+    <h3><span id="siteModalTitle">Nuevo site</span><span class="x" id="closeSiteModal">&times;</span></h3>
+    <input type="hidden" id="mSiteId">
+    <div class="field"><label>Nombre del site / local</label><input type="text" id="mName" placeholder="Ej: ADVANT Lindora"></div>
+    <div class="row">
+      <div class="field"><label>Provincia</label><input type="text" id="mProv" placeholder="San José"></div>
+      <div class="field"><label>Cantón</label><input type="text" id="mCanton" placeholder="Santa Ana"></div>
+    </div>
+    <div class="field"><label>Dirección</label><input type="text" id="mAddr" placeholder="Dirección exacta"></div>
+    <div class="row">
+      <div class="field"><label>Latitud</label><input type="text" id="mLat" inputmode="decimal" placeholder="9.93333"></div>
+      <div class="field"><label>Longitud</label><input type="text" id="mLng" inputmode="decimal" placeholder="-84.08333"></div>
+    </div>
+    <button class="btn btn-green btn-block" id="captureLoc" style="margin-bottom:14px;">📍 Capturar mi ubicación actual</button>
+    <div class="capture-note" id="captureNote" style="display:none;"></div>
+    <div class="field"><label>Radio permitido (metros)</label><input type="number" id="mRadius" inputmode="numeric" placeholder="100" value="100"></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="mActive" checked style="width:auto;">Site activo</label></div>
+    <button class="btn btn-primary btn-block" id="saveSite">Guardar site</button>
+  </div>
+</div>
+
+<!-- MODAL PIN -->
+<div class="modal-bg pin-center-bg" id="pinModalBg">
+  <div class="pin-modal">
+    <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+    <h3 id="pinTitle">Panel administrativo</h3>
+    <p id="pinSubtitle">Ingresá el PIN para continuar</p>
+    <div class="pin-dots" id="pinDots"><span></span><span></span><span></span><span></span></div>
+    <div class="pin-pad" id="pinPad">
+      <button>1</button><button>2</button><button>3</button>
+      <button>4</button><button>5</button><button>6</button>
+      <button>7</button><button>8</button><button>9</button>
+      <button class="fn" data-act="cancel">Cancelar</button>
+      <button>0</button>
+      <button class="fn" data-act="del">Borrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ============================================================
+   CONTROL DE ASISTENCIA GPS — Supabase + PIN + cola offline
+   Lilliana Retana Tech
+   ============================================================ */
+
+const SUPABASE_URL  = 'https://oatufrxbqmrrxlytrmmy.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9hdHVmcnhicW1ycnhseXRybW15Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2NDQ3ODksImV4cCI6MjA5NzIyMDc4OX0.lLfLLciM8XXWE8GihfOwslAZ1-mQtFpSlTvE2db4gmc';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const LS = {
+  emp:'asist_employee_v1', sitesCache:'asist_sites_cache_v1',
+  pending:'asist_pending_v1', pin:'asist_admin_pin_v1'
+};
+const DEFAULT_PIN = '1234';
+
+let SITES = [];
+let LOGS  = [];
+let PENDING = [];
+let summaryMode = false;
+let adminUnlocked = false;
+
+/* ---------- storage ---------- */
+function load(k,f){ try{const v=localStorage.getItem(k);return v?JSON.parse(v):f;}catch(e){return f;} }
+function save(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+
+/* ---------- Haversine ---------- */
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000, toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
+}
+
+/* ---------- utils ---------- */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function toast(m){ const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600); }
+function fmtDateTime(iso){ return new Date(iso).toLocaleString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString('es-CR',{hour:'2-digit',minute:'2-digit'}); }
+function dateKey(iso){ return new Date(iso).toISOString().slice(0,10); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function deviceInfo(){ const ua=navigator.userAgent;let os='Desconocido';if(/Android/i.test(ua))os='Android';else if(/iPhone|iPad|iPod/i.test(ua))os='iOS';else if(/Windows/i.test(ua))os='Windows';else if(/Mac/i.test(ua))os='macOS';return os+' · '+(navigator.language||''); }
+
+function setSync(state){ // 'ok' | 'off' | 'pending'
+  const d=document.getElementById('syncDot');
+  d.className='sync-dot'+(state==='ok'?' ok':state==='off'?' off':'');
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+async function init(){
+  PENDING = load(LS.pending, []);
+  const emp = load(LS.emp, null);
+  if(emp){ document.getElementById('empName').value=emp.name||''; document.getElementById('empCode').value=emp.code||''; }
+
+  bindEvents();
+  await loadSites();
+  renderPendingBanner();
+  flushPending(); // intento sincronizar lo que quedó pendiente
+}
+
+/* ---------- Sites (Supabase + cache) ---------- */
+async function loadSites(){
+  try{
+    const {data,error} = await sb.from('sites').select('*').order('site_name');
+    if(error) throw error;
+    SITES = data||[];
+    save(LS.sitesCache, SITES);
+    setSync('ok');
+  }catch(e){
+    SITES = load(LS.sitesCache, []);
+    setSync('off');
+    if(SITES.length===0) toast('Sin conexión y sin sites en caché');
+    else toast('Sin conexión: usando sites en caché');
+  }
+  renderSiteSelect();
+  renderSitesList();
+}
+
+/* ============================================================
+   MARCAR
+   ============================================================ */
+function renderSiteSelect(){
+  const sel=document.getElementById('siteSelect'); const prev=sel.value;
+  sel.innerHTML='<option value="">— Elegí un site —</option>';
+  SITES.filter(s=>s.activo).forEach(s=>{
+    const o=document.createElement('option');o.value=s.site_id;
+    o.textContent=`${s.site_name} (${s.canton||''}, ${s.provincia||''})`;
+    sel.appendChild(o);
+  });
+  sel.value=prev; updateSiteInfo();
+}
+function updateSiteInfo(){
+  const id=document.getElementById('siteSelect').value;
+  const box=document.getElementById('siteInfo');
+  const s=SITES.find(x=>x.site_id===id);
+  if(s){ box.style.display='block'; box.innerHTML=`📍 ${esc(s.direccion||'')} · radio permitido: <b>${s.radio_metros} m</b>`; }
+  else box.style.display='none';
+}
+function saveEmployee(){
+  const name=document.getElementById('empName').value.trim();
+  const code=document.getElementById('empCode').value.trim();
+  if(!name){ toast('Escribí tu nombre primero'); return false; }
+  save(LS.emp,{name,code}); toast('Datos guardados ✓'); return true;
+}
+
+function getPosition(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation){ resolve({status:'error',reason:'Este dispositivo no soporta GPS'}); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos=>resolve({status:'ok',lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy}),
+      err=>{ if(err.code===1)resolve({status:'sin_permiso',reason:'Permiso de ubicación denegado'});
+             else if(err.code===3)resolve({status:'error',reason:'Tiempo de espera del GPS agotado'});
+             else resolve({status:'error',reason:'No se pudo obtener la ubicación'}); },
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  });
+}
+function showStatus(type,title,detail){
+  const box=document.getElementById('statusBox');
+  box.className='show '+type;
+  box.innerHTML=`<div class="st-title">${title}</div><div class="st-detail">${detail}</div>`;
+}
+
+async function registerMark(checkType){
+  const name=document.getElementById('empName').value.trim();
+  const code=document.getElementById('empCode').value.trim();
+  const siteId=document.getElementById('siteSelect').value;
+  if(!name){ toast('⚠️ Escribí el nombre del funcionario'); document.getElementById('empName').focus(); return; }
+  if(!siteId){ toast('⚠️ Seleccioná el site / local'); document.getElementById('siteSelect').focus(); return; }
+  const site=SITES.find(s=>s.site_id===siteId);
+  if(!site){ toast('Site no válido'); return; }
+
+  // anti-duplicados (revisa memoria + pendientes)
+  const now=Date.now();
+  const recent=[...LOGS,...PENDING].find(l=>
+    l.employee_name&&l.employee_name.toLowerCase()===name.toLowerCase() &&
+    l.check_type===checkType && (now-new Date(l.timestamp).getTime())<120000);
+  if(recent){
+    showStatus('warn','Registro reciente detectado',`Ya marcaste ${checkType} hace menos de 2 minutos. Esperá un momento antes de volver a marcar.`);
+    toast('Marca duplicada bloqueada'); return;
+  }
+
+  save(LS.emp,{name,code});
+
+  const btnIn=document.getElementById('btnIn'),btnOut=document.getElementById('btnOut');
+  btnIn.disabled=btnOut.disabled=true;
+  document.getElementById('gpsDot').style.background='#2563eb';
+  document.getElementById('gpsHint').textContent='Obteniendo ubicación GPS…';
+
+  const pos=await getPosition();
+
+  btnIn.disabled=btnOut.disabled=false;
+  document.getElementById('gpsDot').style.background='#cbd5e1';
+  document.getElementById('gpsHint').textContent='El GPS se activa al marcar. Tené el celular con ubicación encendida.';
+
+  let gps_status,latitude=null,longitude=null,distance=null,accuracy=null,notes='';
+  if(pos.status==='ok'){
+    latitude=pos.lat;longitude=pos.lng;accuracy=pos.accuracy;
+    distance=haversine(latitude,longitude,site.latitud,site.longitud);
+    gps_status = distance<=site.radio_metros ? 'valido':'fuera_del_sitio';
+    if(accuracy&&accuracy>50) notes=`Precisión GPS baja (±${Math.round(accuracy)} m)`;
+  }else if(pos.status==='sin_permiso'){ gps_status='sin_permiso'; notes=pos.reason; }
+  else { gps_status='error'; notes=pos.reason; }
+
+  const log={
+    id:uid(), employee_name:name, employee_code:code,
+    site_id:site.site_id, site_name:site.site_name, provincia:site.provincia, canton:site.canton,
+    check_type:checkType, timestamp:new Date().toISOString(),
+    latitude, longitude, distance_to_site_meters:distance,
+    gps_accuracy_meters: accuracy?Math.round(accuracy):null,
+    gps_status, device_info:deviceInfo(), notes
+  };
+
+  // intentar guardar en Supabase; si falla, va a la cola
+  let synced=false;
+  try{
+    const {error}=await sb.from('attendance_logs').insert(log);
+    if(error) throw error;
+    synced=true; setSync('ok');
+  }catch(e){
+    PENDING.unshift(log); save(LS.pending,PENDING); setSync('off');
+    renderPendingBanner();
+  }
+
+  const tLabel=checkType==='entrada'?'Entrada':'Salida';
+  const hora=fmtTime(log.timestamp);
+  const offlineNote = synced ? '' : ' (guardada en el celular, se sincronizará al recuperar señal)';
+  if(gps_status==='valido')
+    showStatus('ok',`✅ ${tLabel} registrada · ${hora}`,`Ubicación válida en ${site.site_name}. Distancia: ${distance} m (radio: ${site.radio_metros} m).${accuracy?' Precisión ±'+Math.round(accuracy)+' m.':''}${offlineNote}`);
+  else if(gps_status==='fuera_del_sitio')
+    showStatus('bad',`🔴 ${tLabel} registrada — Fuera del sitio · ${hora}`,`Estás a ${distance} m de ${site.site_name} (radio: ${site.radio_metros} m). Quedó guardada para revisión del supervisor.${offlineNote}`);
+  else if(gps_status==='sin_permiso')
+    showStatus('warn',`🟡 ${tLabel} registrada — Sin permiso GPS · ${hora}`,`No se pudo validar la ubicación porque no diste permiso. Activá la ubicación para próximas marcas.${offlineNote}`);
+  else
+    showStatus('warn',`🟡 ${tLabel} registrada — Error de GPS · ${hora}`,`${notes}. Quedó guardada sin validación de ubicación.${offlineNote}`);
+  toast(`${tLabel} registrada`);
+}
+
+/* ---------- cola offline ---------- */
+function renderPendingBanner(){
+  const b=document.getElementById('pendingBanner');
+  if(PENDING.length>0){ b.classList.add('show'); document.getElementById('pendingText').textContent=`${PENDING.length} marca(s) sin sincronizar`; }
+  else b.classList.remove('show');
+}
+async function flushPending(){
+  if(PENDING.length===0) return;
+  const remaining=[];
+  for(const log of PENDING){
+    try{ const {error}=await sb.from('attendance_logs').insert(log); if(error) throw error; }
+    catch(e){ remaining.push(log); }
+  }
+  const sentCount = PENDING.length - remaining.length;
+  PENDING=remaining; save(LS.pending,PENDING); renderPendingBanner();
+  if(sentCount>0){ setSync('ok'); toast(`${sentCount} marca(s) sincronizada(s) ✓`); }
+  else if(remaining.length>0) setSync('off');
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+async function fetchLogs(){
+  try{
+    const {data,error}=await sb.from('attendance_logs').select('*').order('timestamp',{ascending:false}).limit(2000);
+    if(error) throw error;
+    // combinar con pendientes locales (marcados aparte)
+    const pend=PENDING.map(p=>({...p,_pending:true}));
+    LOGS=[...pend,...(data||[])];
+    setSync(PENDING.length>0?'off':'ok');
+  }catch(e){
+    LOGS=PENDING.map(p=>({...p,_pending:true}));
+    setSync('off');
+    toast('Sin conexión: mostrando solo marcas locales');
+  }
+}
+async function refreshAdmin(){
+  await fetchLogs();
+  populateFilterSelect('fSite',SITES.map(s=>({v:s.site_id,t:s.site_name})));
+  populateFilterSelect('fProv',[...new Set(SITES.map(s=>s.provincia).filter(Boolean))].map(p=>({v:p,t:p})));
+  populateFilterSelect('fCanton',[...new Set(SITES.map(s=>s.canton).filter(Boolean))].map(c=>({v:c,t:c})));
+  applyFilters();
+}
+function applyFilters(){
+  const logs=getFilteredLogs();
+  renderSummaryBar(logs);
+  if(summaryMode) renderDailySummary(logs); else renderLogsTable(logs);
+}
+function getFilteredLogs(){
+  const from=document.getElementById('fDateFrom').value, to=document.getElementById('fDateTo').value;
+  const emp=document.getElementById('fEmp').value.trim().toLowerCase();
+  const site=document.getElementById('fSite').value, prov=document.getElementById('fProv').value;
+  const canton=document.getElementById('fCanton').value, type=document.getElementById('fType').value, gps=document.getElementById('fGps').value;
+  return LOGS.filter(l=>{
+    const dk=dateKey(l.timestamp);
+    if(from&&dk<from)return false; if(to&&dk>to)return false;
+    if(emp&&!l.employee_name.toLowerCase().includes(emp))return false;
+    if(site&&l.site_id!==site)return false; if(prov&&l.provincia!==prov)return false;
+    if(canton&&l.canton!==canton)return false; if(type&&l.check_type!==type)return false;
+    if(gps&&l.gps_status!==gps)return false; return true;
+  });
+}
+function populateFilterSelect(id,items){
+  const sel=document.getElementById(id);const prev=sel.value;
+  const first=sel.querySelector('option').outerHTML;sel.innerHTML=first;
+  items.forEach(it=>{const o=document.createElement('option');o.value=it.v;o.textContent=it.t;sel.appendChild(o);});
+  sel.value=prev;
+}
+function renderSummaryBar(logs){
+  const total=logs.length;
+  const fuera=logs.filter(l=>l.gps_status==='fuera_del_sitio').length;
+  const sinPerm=logs.filter(l=>l.gps_status==='sin_permiso'||l.gps_status==='error').length;
+  const valido=logs.filter(l=>l.gps_status==='valido').length;
+  document.getElementById('summaryBar').innerHTML=`
+    <div class="stat"><div class="n">${total}</div><div class="l">Marcas</div></div>
+    <div class="stat"><div class="n" style="color:var(--green)">${valido}</div><div class="l">Válidas</div></div>
+    <div class="stat danger"><div class="n">${fuera}</div><div class="l">Fuera</div></div>
+    <div class="stat warn"><div class="n">${sinPerm}</div><div class="l">Sin GPS</div></div>`;
+  const alerts=fuera+sinPerm; const nav=document.getElementById('navAdmin'); let b=nav.querySelector('.nav-badge');
+  if(alerts>0){ if(!b){b=document.createElement('span');b.className='nav-badge';nav.appendChild(b);} b.textContent=alerts>99?'99+':alerts; }
+  else if(b) b.remove();
+}
+function gpsTag(s){ const m={valido:'Válido',fuera_del_sitio:'Fuera de sitio',sin_permiso:'Sin permiso',error:'Error'};return `<span class="tag tag-${s}">${m[s]||s}</span>`; }
+function renderLogsTable(logs){
+  const c=document.getElementById('logsContainer');
+  if(logs.length===0){ c.innerHTML=emptyState('No hay registros con estos filtros'); return; }
+  const rows=logs.map(l=>{
+    const isAlert=l.gps_status==='fuera_del_sitio'||l.gps_status==='sin_permiso'||l.gps_status==='error';
+    const cls=l.gps_status==='fuera_del_sitio'?'alert-row crit':(isAlert?'alert-row':'');
+    const dist=l.distance_to_site_meters!=null?l.distance_to_site_meters+' m':'—';
+    const pend=l._pending?' <span class="tag tag-pending">sin sincronizar</span>':'';
+    return `<tr class="${cls}">
+      <td>${fmtDateTime(l.timestamp)}${pend}</td>
+      <td><b>${esc(l.employee_name)}</b>${l.employee_code?'<br><span class="tiny muted">'+esc(l.employee_code)+'</span>':''}</td>
+      <td>${esc(l.site_name)}</td>
+      <td><span class="tag tag-${l.check_type==='entrada'?'in':'out'}">${l.check_type}</span></td>
+      <td>${gpsTag(l.gps_status)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;">${dist}</td>
+      <td class="tiny muted">${esc(l.notes||'')}</td>
+    </tr>`;
+  }).join('');
+  c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Fecha / hora</th><th>Funcionario</th><th>Site</th><th>Tipo</th><th>GPS</th><th>Dist.</th><th>Notas</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderDailySummary(logs){
+  const c=document.getElementById('logsContainer');
+  if(logs.length===0){ c.innerHTML=emptyState('No hay registros con estos filtros'); return; }
+  const groups={};
+  logs.forEach(l=>{
+    const key=l.employee_name+'|'+dateKey(l.timestamp)+'|'+l.site_id;
+    if(!groups[key]) groups[key]={emp:l.employee_name,date:dateKey(l.timestamp),site:l.site_name,ins:[],outs:[],alerts:0};
+    if(l.check_type==='entrada')groups[key].ins.push(l.timestamp); else groups[key].outs.push(l.timestamp);
+    if(l.gps_status==='fuera_del_sitio'||l.gps_status==='sin_permiso'||l.gps_status==='error')groups[key].alerts++;
+  });
+  const arr=Object.values(groups).sort((a,b)=>b.date.localeCompare(a.date)||a.emp.localeCompare(b.emp));
+  const rows=arr.map(g=>{
+    const firstIn=g.ins.length?g.ins.sort()[0]:null, lastOut=g.outs.length?g.outs.sort().slice(-1)[0]:null;
+    let horas='—';
+    if(firstIn&&lastOut){ const ms=new Date(lastOut)-new Date(firstIn); if(ms>0){const h=Math.floor(ms/3600000),m=Math.round((ms%3600000)/60000);horas=`${h}h ${m}m`;} }
+    const fechaCR=new Date(g.date+'T12:00').toLocaleDateString('es-CR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    return `<tr class="${g.alerts?'alert-row':''}">
+      <td>${fechaCR}</td><td><b>${esc(g.emp)}</b></td><td>${esc(g.site)}</td>
+      <td>${firstIn?fmtTime(firstIn):'—'}</td><td>${lastOut?fmtTime(lastOut):'—'}</td>
+      <td><b>${horas}</b></td>
+      <td style="text-align:center;">${g.alerts?'<span class="tag tag-fuera">'+g.alerts+'</span>':'<span class="tiny muted">0</span>'}</td>
+    </tr>`;
+  }).join('');
+  c.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Funcionario</th><th>Site</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Alertas</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function emptyState(msg){
+  return `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div>${msg}</div></div>`;
+}
+function exportCSV(){
+  const logs=getFilteredLogs();
+  if(logs.length===0){ toast('No hay registros para exportar'); return; }
+  const cols=['id','employee_name','employee_code','site_id','site_name','provincia','canton','check_type','timestamp','latitude','longitude','distance_to_site_meters','gps_accuracy_meters','gps_status','device_info','notes'];
+  const head=cols.join(',');
+  const lines=logs.map(l=>cols.map(c=>{let v=l[c];if(v==null)v='';v=String(v).replace(/"/g,'""');return /[",\n]/.test(v)?`"${v}"`:v;}).join(','));
+  const csv='\uFEFF'+head+'\n'+lines.join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download=`asistencia_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+  toast(`${logs.length} registros exportados ✓`);
+}
+
+/* ============================================================
+   SITES (catálogo en Supabase)
+   ============================================================ */
+function renderSitesList(){
+  const c=document.getElementById('sitesList');
+  document.getElementById('siteCount').textContent=`${SITES.length} sites · ${SITES.filter(s=>s.activo).length} activos`;
+  if(SITES.length===0){ c.innerHTML=emptyState('No hay sites. Agregá el primero.'); return; }
+  c.innerHTML=SITES.map(s=>`
+    <div class="site-item ${s.activo?'':'off'}">
+      <div class="si-body">
+        <div class="si-name">${esc(s.site_name)}<span class="badge ${s.activo?'badge-on':'badge-off'}">${s.activo?'Activo':'Inactivo'}</span></div>
+        <div class="si-meta">${esc(s.canton||'')}, ${esc(s.provincia||'')} · radio ${s.radio_metros} m</div>
+        <div class="si-coords">${Number(s.latitud).toFixed(5)}, ${Number(s.longitud).toFixed(5)}</div>
+      </div>
+      <div class="si-actions">
+        <button onclick="editSite('${s.site_id}')">Editar</button>
+        <button onclick="toggleSite('${s.site_id}')">${s.activo?'Desactivar':'Activar'}</button>
+      </div>
+    </div>`).join('');
+}
+function openSiteModal(site){
+  document.getElementById('siteModalTitle').textContent=site?'Editar site':'Nuevo site';
+  document.getElementById('mSiteId').value=site?site.site_id:'';
+  document.getElementById('mName').value=site?site.site_name:'';
+  document.getElementById('mProv').value=site?(site.provincia||''):'';
+  document.getElementById('mCanton').value=site?(site.canton||''):'';
+  document.getElementById('mAddr').value=site?(site.direccion||''):'';
+  document.getElementById('mLat').value=site?site.latitud:'';
+  document.getElementById('mLng').value=site?site.longitud:'';
+  document.getElementById('mRadius').value=site?site.radio_metros:100;
+  document.getElementById('mActive').checked=site?site.activo:true;
+  document.getElementById('captureNote').style.display='none';
+  document.getElementById('siteModalBg').classList.add('show');
+}
+function closeSiteModal(){ document.getElementById('siteModalBg').classList.remove('show'); }
+window.editSite=function(id){ const s=SITES.find(x=>x.site_id===id); if(s)openSiteModal(s); };
+window.toggleSite=async function(id){
+  const s=SITES.find(x=>x.site_id===id); if(!s)return;
+  const nuevo=!s.activo;
+  try{
+    const {error}=await sb.from('sites').update({activo:nuevo}).eq('site_id',id);
+    if(error)throw error;
+    s.activo=nuevo; save(LS.sitesCache,SITES);
+    renderSitesList();renderSiteSelect(); toast(nuevo?'Site activado':'Site desactivado'); setSync('ok');
+  }catch(e){ toast('No se pudo actualizar (sin conexión)'); setSync('off'); }
+};
+async function saveSiteFromModal(){
+  const id=document.getElementById('mSiteId').value;
+  const name=document.getElementById('mName').value.trim();
+  const lat=parseFloat(document.getElementById('mLat').value);
+  const lng=parseFloat(document.getElementById('mLng').value);
+  const radius=parseInt(document.getElementById('mRadius').value)||100;
+  if(!name){ toast('Escribí el nombre del site'); return; }
+  if(isNaN(lat)||isNaN(lng)){ toast('Latitud y longitud son obligatorias'); return; }
+  const data={ site_name:name, provincia:document.getElementById('mProv').value.trim(),
+    canton:document.getElementById('mCanton').value.trim(), direccion:document.getElementById('mAddr').value.trim(),
+    latitud:lat, longitud:lng, radio_metros:radius, activo:document.getElementById('mActive').checked };
+  try{
+    if(id){
+      const {error}=await sb.from('sites').update(data).eq('site_id',id); if(error)throw error;
+      Object.assign(SITES.find(x=>x.site_id===id),data);
+    }else{
+      data.site_id='S'+String(Date.now()).slice(-6);
+      const {error}=await sb.from('sites').insert(data); if(error)throw error;
+      SITES.push(data);
+    }
+    save(LS.sitesCache,SITES);
+    renderSitesList();renderSiteSelect(); closeSiteModal(); toast('Site guardado ✓'); setSync('ok');
+  }catch(e){ toast('No se pudo guardar (revisá conexión)'); setSync('off'); }
+}
+function captureCurrentLocation(){
+  const note=document.getElementById('captureNote'); note.style.display='block'; note.textContent='Obteniendo ubicación…';
+  if(!navigator.geolocation){ note.textContent='Este dispositivo no soporta GPS.'; return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ document.getElementById('mLat').value=pos.coords.latitude.toFixed(6); document.getElementById('mLng').value=pos.coords.longitude.toFixed(6);
+      note.textContent=`✓ Ubicación capturada (precisión ±${Math.round(pos.coords.accuracy)} m). Verificá el radio.`; },
+    err=>{ note.textContent= err.code===1?'No diste permiso de ubicación.':'No se pudo obtener la ubicación. Probá de nuevo.'; },
+    {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+}
+
+/* ============================================================
+   PIN del panel admin
+   ============================================================ */
+let pinBuffer='', pinMode='unlock', pinFirstEntry='';
+function getPin(){ return load(LS.pin, DEFAULT_PIN); }
+function openPin(mode){
+  pinMode=mode; pinBuffer=''; pinFirstEntry=''; updatePinDots();
+  document.getElementById('pinTitle').textContent = mode==='unlock'?'Panel administrativo':'Nuevo PIN';
+  document.getElementById('pinSubtitle').textContent = mode==='unlock'?'Ingresá el PIN para continuar':'Ingresá un nuevo PIN de 4 dígitos';
+  document.getElementById('pinModalBg').classList.add('show');
+}
+function closePin(){ document.getElementById('pinModalBg').classList.remove('show'); }
+function updatePinDots(err){
+  const dots=document.getElementById('pinDots');
+  dots.className='pin-dots'+(err?' err':'');
+  dots.querySelectorAll('span').forEach((s,i)=>s.classList.toggle('filled',i<pinBuffer.length));
+}
+function pinDigit(d){
+  if(pinBuffer.length>=4)return;
+  pinBuffer+=d; updatePinDots();
+  if(pinBuffer.length===4) setTimeout(handlePinComplete,150);
+}
+function handlePinComplete(){
+  if(pinMode==='unlock'){
+    if(pinBuffer===getPin()){ adminUnlocked=true; closePin(); doSwitch('admin'); }
+    else { updatePinDots(true); pinBuffer=''; setTimeout(()=>updatePinDots(),400); toast('PIN incorrecto'); }
+  }else if(pinMode==='change'){
+    if(!pinFirstEntry){ pinFirstEntry=pinBuffer; pinBuffer='';
+      document.getElementById('pinSubtitle').textContent='Repetí el nuevo PIN'; updatePinDots(); }
+    else { if(pinBuffer===pinFirstEntry){ save(LS.pin,pinBuffer); closePin(); toast('PIN actualizado ✓'); }
+      else { updatePinDots(true); pinBuffer=''; pinFirstEntry=''; document.getElementById('pinSubtitle').textContent='No coincidió. Ingresá un nuevo PIN'; setTimeout(()=>updatePinDots(),400); } }
+  }
+}
+
+/* ============================================================
+   NAV + EVENTOS
+   ============================================================ */
+function doSwitch(v){
+  document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  const subs={mark:'Registro de marcas con validación GPS',admin:'Registros, alertas y reportes',sites:'Administración de ubicaciones'};
+  document.getElementById('headerSub').textContent=subs[v];
+  window.scrollTo(0,0);
+  if(v==='admin') refreshAdmin();
+}
+function switchView(v){
+  if(v==='admin' && !adminUnlocked){ openPin('unlock'); return; }
+  doSwitch(v);
+}
+function bindEvents(){
+  document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+  document.getElementById('saveEmp').onclick=saveEmployee;
+  document.getElementById('siteSelect').onchange=updateSiteInfo;
+  document.getElementById('btnIn').onclick=()=>registerMark('entrada');
+  document.getElementById('btnOut').onclick=()=>registerMark('salida');
+  document.getElementById('syncNow').onclick=flushPending;
+
+  ['fDateFrom','fDateTo','fEmp','fSite','fProv','fCanton','fType','fGps'].forEach(id=>document.getElementById(id).addEventListener('input',applyFilters));
+  document.getElementById('clearFilters').onclick=()=>{ ['fDateFrom','fDateTo','fEmp','fSite','fProv','fCanton','fType','fGps'].forEach(id=>document.getElementById(id).value=''); applyFilters(); };
+  document.getElementById('exportCsv').onclick=exportCSV;
+  document.getElementById('refreshLogs').onclick=refreshAdmin;
+  document.getElementById('toggleSummaryView').onclick=(e)=>{ summaryMode=!summaryMode; e.target.textContent=summaryMode?'Ver registros':'Ver resumen diario'; applyFilters(); };
+  document.getElementById('changePin').onclick=()=>openPin('change');
+
+  document.getElementById('addSite').onclick=()=>openSiteModal(null);
+  document.getElementById('closeSiteModal').onclick=closeSiteModal;
+  document.getElementById('siteModalBg').onclick=(e)=>{ if(e.target.id==='siteModalBg')closeSiteModal(); };
+  document.getElementById('saveSite').onclick=saveSiteFromModal;
+  document.getElementById('captureLoc').onclick=captureCurrentLocation;
+
+  // teclado PIN
+  document.getElementById('pinPad').addEventListener('click',(e)=>{
+    const btn=e.target.closest('button'); if(!btn)return;
+    const act=btn.dataset.act;
+    if(act==='cancel'){ closePin(); }
+    else if(act==='del'){ pinBuffer=pinBuffer.slice(0,-1); updatePinDots(); }
+    else pinDigit(btn.textContent);
+  });
+  document.getElementById('pinModalBg').onclick=(e)=>{ if(e.target.id==='pinModalBg')closePin(); };
+
+  // reintentar sincronización al recuperar conexión
+  window.addEventListener('online', ()=>{ setSync('ok'); flushPending(); });
+  window.addEventListener('offline', ()=>setSync('off'));
+}
+
+init();
+</script>
+</body>
+</html>
